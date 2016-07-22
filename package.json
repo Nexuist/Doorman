@@ -1,0 +1,24 @@
+{
+  "name": "NodeGarageServer",
+  "version": "3.0.0",
+  "description": "A restify web server that toggles my garage doors and hosts a webcam stream.",
+  "author": "Andi Andreas <nexuister@gmail.com>",
+  "scripts": {
+    "start": "node main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nexuist/NodeGarageServer"
+  },
+  "bugs": {
+    "url": "https://github.com/nexuist/NodeGarageServer/issues"
+  },
+  "dependencies": {
+    "buffertools": "2.1.x",
+    "restify": "4.0.x",
+    "mailgun": "0.5.x",
+    "mjpeg-proxy": "0.2.x",
+    "simple-node-logger": "0.92.x"
+  },
+  "license": "MIT"
+}
