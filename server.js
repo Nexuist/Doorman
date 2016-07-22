@@ -1,138 +1,137 @@
-var restify = require("restify");
-var crypto = require("crypto");
-var exec = require("child_process").exec;
-var fs = require("fs");
-var pb = require("pushbullet");
-pb = new pb("[REDACTED]"); // PushBullet auth token
-var loggingOptions = {
-  logFilePath: "/home/pi/http/garage.log",
+// Dependencies
+var restify = require("restify")
+var fs = require("fs")
+var mjpegProxy = require("mjpeg-proxy").MjpegProxy
+var exec = require("child_process").exec
+var mailgun = require("mailgun")
+var node_logger = require("simple-node-logger")
+
+// Constants
+var MAILGUN_API_KEY = "[REDACTED]"
+var LOG_FILE_PATH = "garage.log"
+var SERVER_VERSION = "2.0"
+var SERVER_SSL_KEY = fs.readFileSync("pi.key")
+var SERVER_SSL_CERT = fs.readFileSync("pi.crt")
+var CAM_URI = "http://admin:[REDACTED]@[REDACTED]:99/videostream.cgi"
+var KEYS = {
+  "[REDACTED]": {
+    name: "Mom",
+    email: "[REDACTED]@mms.att.net"
+  },
+  "[REDACTED]": {
+    name: "Dad",
+    email: "[REDACTED]@mms.att.net"
+  },
+  "[REDACTED]": {
+    name: "Andi",
+    email: "[REDACTED]@mms.att.net"
+  }
+}
+var GARAGE_EMAIL = "[REDACTED]"
+var ANDI_EMAIL = KEYS["[REDACTED]"]["email"]
+var EMAILS = []
+for (key in KEYS) {
+  EMAILS.push(key["email"])
+}
+
+// Logging
+var mail = new mailgun.Mailgun(MAILGUN_API_KEY)
+var logger = new node_logger.createSimpleFileLogger({
+  logFilePath: LOG_FILE_PATH,
   timestampFormat: "MM-DD HH:mm:ss"
-}
-var log = require("simple-node-logger").createSimpleFileLogger(loggingOptions);
+})
 
-var key = "[REDACTED]"; // Key used to encrypt timestamps
-var live = true; // If this is set to false the GPIO pins will never actually be manipulated
-
-function sendPush(text) {
-  function pbResult(error, response) {
-    if (error) {
-      log.error("Message couldn't be sent to PushBullet: '", text, "'")
+function mailAndi(subject, text) {
+  mail.sendText(GARAGE_EMAIL, ANDI_EMAIL, subject, text, function (err) {
+    if (err) {
+      logger.error("Error sending mail: " + err)
     }
-  }
-  var andi = "[REDACTED]"; // ID for Andi's iPhone
-  var cimi = "[REDACTED]";
-  pb.note(andi, "Garage - " + text, "", pbResult);
-  pb.note(cimi, "Garage - " + text, "", pbResult);
+  })
 }
 
-function toggleDoor(door) {
-  if (live != true) {
-    log.info("Door ", door, " not toggled - LIVE mode OFF")
-    sendPush("Door " + door + " not toggled - LIVE mode OFF")
-    return;
-  }
-  var pin = (door == 1) ? 0 : 6; // GPIO6, handles left door
-  var command = "gpio mode pin out; gpio write pin 1; sleep 1; gpio write pin 0";
-  command = command.replace(/gpio/g, "/usr/local/bin/gpio");
-  command = command.replace(/pin/g, pin);
-  var attempt = exec(command,
-  function (error, stdout, stderr) {
-    if (error !== null) {
-      log.error(error);
-      log.error(stderr);
-      sendPush(error + " | " + stderrr);
+function mailAll(subject, text) {
+  mail.sendText(GARAGE_EMAIL, EMAILS, subject, text, function (err) {
+    if (err) {
+      logger.error("Error sending mail: " + err)
     }
-    else {
-      log.info("Toggled door " + door);
-    }
-  });
+  })
 }
 
-function legitimateRequest(req) {
-  var ip = req.connection.remoteAddress;
-  var url = req.url;
-  var timestamp = req.params[1];
-  var signature = req.params[2];
-  // First let's make sure the timestamp is properly signed to prevent unauthorized access
-  var hashedTimestamp = crypto.createHmac("sha256", key).update(timestamp).digest("hex");
-  if (hashedTimestamp != signature) {
-    // The hashes don't match up
-    log.warn("Hash mismatch from " + ip + " | " + url);
-    //sendPush("Hash mismatch from " + ip);
-    return false;
+
+logger.warn = function() {
+  var args = Array.prototype.slice.call(arguments)
+  logger.log("warn", args)
+  mailAndi("Warning", args.join(" "))
+}
+
+logger.error = function() {
+  var args = Array.prototype.slice.call(arguments)
+  logger.log("error", args)
+  mailAndi("Error", args.join(" "))
+}
+
+// Static variables
+var lastOpenedBy = "Nobody"
+var lastOpenedTimestamp = 0
+
+// Endpoints
+function metadata(req, res, next) {
+  var metadata = {
+    version: SERVER_VERSION,
+    lastOpenedBy: lastOpenedBy,
+    lastOpenedTimestamp: lastOpenedTimestamp
   }
-  // The request is genuine. Now we want to validate the timestamp to prevent replay attacks
-  var currentTimestamp = Math.round(+new Date()/1000); // Gives us the UNIX timestamp in seconds
-  var timeWindow = 3; // The amount of time the request has to get to the server before it is invalidated
-  if (!(timestamp < (currentTimestamp + timeWindow) && timestamp > (currentTimestamp - timeWindow))) {
-    // The timestamp is not within the accepted range
-    log.warn("Timestamp mismatch from " + ip + " | " + url);
-    //sendPush("Timestamp mismatch from " + ip);
-    return false;
+  res.send(metadata)
+  next()
+}
+
+function toggle(req, res, next) {
+  var pin = (req.params[0] == 1) ? 0 : 6 // GPIO6 handles left door
+  var cmd = "gpio mode pin out; gpio write pin 1; sleep 1; gpio write pin 0";
+  cmd = cmd.replace(/gpio/g, "/usr/local/bin/gpio");
+  cmd = cmd.replace(/pin/g, pin);
+  exec(cmd, function(err, stdout, stderr) {
+    if (err !== null) {
+      logger.error("GPIO Error: ", err)
+      logger.error("GPIO STDERR: ", stderr)
+      res.send(500, "Failed")
+    } else {
+      // Success
+      lastOpenedBy = KEYS[req.headers["authorization"]]
+      lastOpenedTimestamp = Math.round(+new Date() / 1000)
+      var text = "Door " + door + " toggled by " + lastOpenedBy
+      logger.info(text)
+      mailAll("Door Toggled", text)
+      res.send(200, "Success")
+  }
+  next()
+  })
+}
+
+function authenticate(req, res, next) {
+  if (req.headers["authorization"] in KEYS) {
+    next()
   }
   else {
-    // Success!
-    return true;
+    logger.warn("Denied attempt from ", req.connection.remoteAddress)
+    res.send(401, "Forbidden")
   }
 }
 
-function handleDoorRequest(req, res, next) {
-  var door = req.params[0];
-  if (legitimateRequest(req)) {
-    toggleDoor(door);
-    res.send(200, "OK");
-    return next();
-  }
-  else {
-    res.send(401, "Nope");
-    return next();
-  }
-}
+// Server
+var server = restify.createServer({
+  name: "GarageServer v" + SERVER_VERSION,
+  key: SERVER_SSL_KEY,
+  certificate: SERVER_SSL_CERT
+})
 
-function handleCamRequest(req, res, next) {
-  if (legitimateRequest(req)) {
-    var command = "curl admin:[REDACTED]@[REDACTED]:99/snapshot.cgi > /home/pi/http/snapshot.jpeg";
-    var attempt = exec(command,
-    function (error, stdout, stderr) {
-      if (error !== null) {
-        log.error(error);
-        log.error(stderr);
-        sendPush(error + " | " + stderrr);
-        res.send(500, "Fail");
-      }
-      else {
-        res.writeHead(200, {"Content-Type": "image/jpeg"});
-        var img  = fs.readFileSync("/home/pi/http/snapshot.jpeg");
-        res.end(img, "binary");
-      }
-      next();
-    });
-  }
-  else {
-    res.send(401, "Nope");
-    return next();
-  }
-}
 
-function handleVersionRequest(req, res, next) {
-  var version = "1.2";
-  res.send(version);
-  next();
-}
-
-var server = restify.createServer({"name": "GarageServer v1.0"});
-server.get(/\/toggle\/([12])\/(\S[0-9]*)\/(\S[0-9A-Fa-f]*)/, handleDoorRequest);
-/*
-/toggle/DOOR/TIMESTAMP/SIGNATURE
-
-DOOR can only be 1 or 2.
-TIMESTAMP can be any number of characters as long as they are all numeric.
-SIGNATURE only accepts hexadecimal.
-
-*/
-server.get("/", handleVersionRequest);
-server.get(/\/cam\/([1])\/(\S[0-9]*)\/(\S[0-9A-Fa-f]*)/, handleCamRequest);
+server.use(authenticate) // All endpoints after this require authentication
+server.get("/metadata", metadata)
+server.get(/\/toggle\/([12])/, toggle)
+server.get("/cam", new mjpegProxy(CAM_URI).proxyRequest)
 
 server.listen(6060, function() {
-  log.info("Server ready to accept requests");
-});
+  logger.info("Ready to accept requests")
+  mailAndi("Server Up", "Ready to accept requests")
+})
