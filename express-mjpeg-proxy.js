@@ -1,5 +1,9 @@
 /*
 	HOW THIS WORKS
+	When a new Proxy object is created, it will establish a connection to the MJPEG stream. Any new data from the stream will be sent to any client in the clients array.
+  The argument can either be a string (in the form a URL) or a dictionary (see line ## for structure).
+
+	When requestHandler is executed, it will add the new client to the clients array. When the client closes the connection, it will be removed from the clients array. requestHandler will also send headers to every new client that preserve the boundary value in the Content-Type header (see MJPEG spec for more information).
 
 */
 
