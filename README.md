@@ -12,7 +12,7 @@ Doorman provides the following features:
 * User system so multiple family members can authenticate
 * Metrics such as number of denied attempts and last time opened
 
-A companion iOS app is provided [here](here). Because the API (see below) is very simple, support for Doorman can easily be extended to many Internet platforms.
+A companion iOS app is provided [here](https://github.com/Nexuist/Doorman-Remote). Because the API (see below) is very simple, support for Doorman can easily be extended to many Internet platforms.
 
 ### Installation
 
