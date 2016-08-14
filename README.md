@@ -92,3 +92,35 @@ Doorman also logs several events using STDOUT. Using forever you can redirect th
 * SIGINT
 * Request accepted/denied, including the IP address and username of the requester and the path they were trying to access
 * GPIO toggles
+
+### Next Steps
+
+* Notifications when the garage is toggled
+
+The previous (non-public) version of Doorman actually had this feature (using https://mailgun.com), but it was removed in this version so I could focus on core functionality. Adding it back wouldn't be that hard, and would give meaning to the `contact` field in the users dictionary.
+
+### License
+
+```
+MIT License
+
+Copyright (c) 2016 Andi Andreas
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
