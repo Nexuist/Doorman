@@ -27,6 +27,7 @@ The following steps should be executed on a Raspberry Pi. They have been tested 
 3. Edit the configuration in `package.json` (see Configuration below).
 
 4. Now we want to make sure that the server will execute as soon as the Raspberry Pi boots up. [RaspberryPi.org](https://www.raspberrypi.org/documentation/linux/usage/rc-local.md) suggests we put all startup commands in /etc/rc.local. Append this to your /etc/rc.local (make sure it comes before exit 0):
+		
 		cd $DIRECTORY
 		sudo -u pi /usr/local/bin/forever start main.js &
 
